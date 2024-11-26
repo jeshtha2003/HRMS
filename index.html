@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HRMS Data Viewer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #e9f5ff;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 {
+            color: #007bff;
+            text-align: center;
+        }
+        .search-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 20px;
+        }
+        #hrms-id-input {
+            margin: 0 10px;
+            padding: 10px;
+            font-size: 16px;
+            width: 300px;
+            border: 2px solid #007bff;
+            border-radius: 5px;
+        }
+        #search-btn, #download-btn {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            margin-left: 10px;
+        }
+        #search-btn:hover, #download-btn:hover {
+            background-color: #0056b3;
+        }
+        #sheet-data {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #007bff;
+            border-radius: 5px;
+            background-color: #fff;
+        }
+        .data-item {
+            margin-bottom: 15px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f0f8ff;
+        }
+        .data-item h3 {
+            margin: 0;
+            font-size: 18px;
+            color: #0056b3;
+        }
+        .data-item p {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        .no-data {
+            color: red;
+            font-weight: bold;
+        }
+        @media (max-width: 600px) {
+            #hrms-id-input {
+                width: 100%;
+            }
+            .search-container {
+                flex-direction: column;
+            }
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+    <h1>SECR Nagpur Division Search Name In Voter List</h1>
+    <div class="search-container">
+        <input type="text" id="hrms-id-input" placeholder="Enter HRMS ID">
+        <button id="search-btn">Search</button>
+        <button id="download-btn" style="display:none;">Download Booth Slip</button>
+    </div>
+    <div id="sheet-data"></div>
+
+    <script>
+        const { jsPDF } = window.jspdf;
+        const sheetDataDiv = document.getElementById("sheet-data");
+        const downloadBtn = document.getElementById("download-btn");
+        const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTzJ0o2zL1oahv4fCmvvDg_Pb39lO1Zo3wF8tUG4I-KGXmX_yNnc_ItuCqGKyRg42vhEraVSOIcUmmf/pub?gid=0&single=true&output=csv";
+        let allData = []; // To store all fetched data
+
+        // Fetch the sheet data
+        async function fetchSheetData() {
+            try {
+                const response = await fetch(csvUrl);
+                const data = await response.text();
+                allData = parseCSV(data); // Store parsed data
+            } catch (error) {
+                console.error("Error fetching sheet data:", error);
+                sheetDataDiv.innerHTML = "Failed to load sheet data.";
+            }
+        }
+
+        // Parse CSV data into an array of objects
+        function parseCSV(data) {
+            const rows = data.split("\n").map(row => row.split(","));
+            const headers = rows[0]; // First row as headers
+            const jsonData = rows.slice(1).map(row => {
+                return headers.reduce((acc, header, index) => {
+                    acc[header.trim()] = row[index] ? row[index].trim() : "#N/A"; // Trim values and handle #N/A
+                    return acc;
+                }, {});
+            });
+            return jsonData;
+        }
+
+        // Display the filtered data in a styled format
+        function displayData(filteredData) {
+            sheetDataDiv.innerHTML = ""; // Clear previous data
+            if (filteredData.length === 0) {
+                sheetDataDiv.innerHTML = "<p class='no-data'>No data found for the given HRMS ID.</p>";
+                downloadBtn.style.display = "none"; // Hide download button if no data
+                return;
+            }
+
+            filteredData.forEach(row => {
+                const dataItem = document.createElement("div");
+                dataItem.className = "data-item";
+                dataItem.innerHTML = `
+                    <h3>HRMS ID: ${row['HRMS id']}</h3>
+                    <p><strong>Constituency Name:</strong> ${row['Constituncy Name']}</p>
+                    <p><strong>Booth No:</strong> ${row['Booth No']}</p>
+                    <p><strong>Polling Location:</strong> ${row['Polling Location']}</p>
+                    <p><strong>Voter List Serial No:</strong> ${row['S.N.']}</p>
+                    <p><strong>Name:</strong> ${row['Name']}</p>
+                    <p><strong>Post/Designation:</strong> ${row['Post/Designation']}</p>
+                    <p><strong>Identity Card/Employee No/Token No:</strong> ${row['Identy Card/Employee No/Token No']}</p>
+                    <p><strong>PF No/Pran No:</strong> ${row['PF No/Pran No']}</p>
+                    <p><strong>Working Under:</strong> ${row['Working Under']}</p>
+                    <p><strong>Station/Place of Working:</strong> ${row['Station/Place of working']}</p>
+                    <p><strong>Remark (If Any):</strong> ${row['Remark (If Any)']}</p>
+                    <p><strong>Division:</strong> ${row['Division']}</p>
+                `;
+                sheetDataDiv.appendChild(dataItem);
+            });
+            downloadBtn.style.display = "block"; // Show download button if data is present
+        }
+
+        // Load the sheet data when the page loads
+        fetchSheetData();
+
+        // Search functionality
+        document.getElementById("search-btn").addEventListener("click", () => {
+            const hrmsId = document.getElementById("hrms-id-input").value.trim();
+            if (hrmsId) {
+                const filteredData = allData.filter(row => row['HRMS id'] === hrmsId);
+                displayData(filteredData);
+            } else {
+                alert("Please enter a valid HRMS ID.");
+            }
+        });
+
+        // Download PDF functionality with table layout
+        downloadBtn.addEventListener("click", () => {
+            const hrmsId = document.getElementById("hrms-id-input").value.trim(); // Get the entered HRMS ID
+            if (!hrmsId) {
+                alert("Please search for an HRMS ID first.");
+                return;
+            }
+
+            const pdf = new jsPDF();
+
+            // Header Section
+            pdf.setFont("helvetica", "bold");
+            pdf.setFontSize(14);
+            pdf.text("SOUTH EAST CENTRAL RAILWAY", 105, 20, { align: "center" });
+            pdf.setFontSize(12);
+            pdf.text("Divisional Office, Nagpur Division, Kingsway, Nagpur", 105, 30, { align: "center" });
+            pdf.text("Secret Ballot Elections - 2024", 105, 40, { align: "center" });
+            pdf.text("BOOTH SLIP", 105, 50, { align: "center" });
+            pdf.text("Polling dates: 4th, 5th & 6th (exclusively for running staff), December -2024", 105, 60, { align: "center" });
+
+            let y = 70;
+
+            const dataItems = sheetDataDiv.querySelectorAll('.data-item');
+            const columns = [["Item", "Description"]];
+
+            const rows = [];
+            dataItems.forEach(item => {
+                const paragraphs = item.querySelectorAll('p');
+                paragraphs.forEach(p => {
+                    const field = p.querySelector('strong').innerText.replace(":", ""); // Get field name
+                    const value = p.innerText.split(": ")[1]; // Get field value
+                    rows.push([field, value]);
+                });
+            });
+
+            pdf.autoTable({
+                head: columns,
+                body: rows,
+                startY: y,
+            });
+            // Add notes at the end
+            y += rows.length * 10 + 20; // Adjust y position after the table
+            pdf.setFont("helvetica", "normal");
+            pdf.text("Note:", 10, y);
+            y += 8;
+            pdf.text("1. Please carry this Booth Slip to avoid delay in voting.", 10, y);
+            y += 8;
+            pdf.text("2. Carry Photo Identity Cards (PIC) issued by the voter's offices in Railways for identification.", 10, y);
+            y += 8;
+            pdf.text("3. Voting without Photo Identity Card (PIC) is not allowed.", 10, y);
+
+            const fileName = `${hrmsId}_Booth_Slip.pdf`;
+            pdf.save(fileName);
+        });
+    </script>
+</body>
+</html>
